@@ -1,0 +1,6 @@
+{
+    "description": "Template used by LLaVO for office31.",
+    "prompt_input": "{input} Give the information about an image: \n{instruction}\n According to the information, choose the most similar category from the given options: ['back pack', 'bike', 'bike helmet', 'bookcase', 'bottle', 'calculator', 'desk chair', 'desk lamp','desktop computer', 'file cabinet', 'headphones', 'keyboard', 'laptop computer', 'letter tray','mobile phone', 'monitor', 'mouse', 'mug', 'paper notebook', 'pen', 'phone', 'printer', 'projector','punchers', 'ring binder', 'ruler', 'scissors', 'speaker', 'stapler', 'tape dispenser', 'trash can'].\n### Answer:",
+    "prompt_no_input": "Give the information about an image: \n{instruction}\n According to the information, choose the most similar category from the given options: ['back pack', 'bike', 'bike helmet', 'bookcase', 'bottle', 'calculator', 'desk chair', 'desk lamp','desktop computer', 'file cabinet', 'headphones', 'keyboard', 'laptop computer', 'letter tray','mobile phone', 'monitor', 'mouse', 'mug', 'paper notebook', 'pen', 'phone', 'printer', 'projector','punchers', 'ring binder', 'ruler', 'scissors', 'speaker', 'stapler', 'tape dispenser', 'trash can'].\n### Answer:",
+    "response_split": "### Answer:"
+}

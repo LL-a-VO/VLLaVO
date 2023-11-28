@@ -1,0 +1,6 @@
+{
+    "description": "Template used by LLaVO for vlcs.",
+    "prompt_input": "{input} Give the information about an image: \n{instruction}\n According to the information, choose the most similar category from the given options: ['bird', 'car', 'chair', 'dog', 'person'].\n### Answer:",
+    "prompt_no_input": "Give the information about an image: \n{instruction}\n According to the information, choose the most similar category from the given options: ['bird', 'car', 'chair', 'dog', 'person'].\n### Answer:",
+    "response_split": "### Answer:"
+}

@@ -1,0 +1,6 @@
+{
+    "description": "Template used by LLaVO for subdomainnet.",
+    "prompt_input": "{input} Give the information about an image: \n{instruction}\n According to the information, choose the most similar category from the given options: ['aircraft_carrier', 'airplane', 'alarm_clock', 'ambulance', 'angel', 'animal_migration', 'ant', 'anvil', 'apple', 'arm', 'asparagus', 'axe', 'backpack', 'banana', 'bandage', 'barn', 'baseball', 'baseball_bat', 'basket', 'basketball', 'bat', 'bathtub', 'beach', 'bear', 'beard', 'bed', 'bee', 'belt', 'bench', 'bicycle', 'binoculars', 'bird'].\n### Answer:",
+    "prompt_no_input": "Give the information about an image: \n{instruction}\n According to the information, choose the most similar category from the given options: ['aircraft_carrier', 'airplane', 'alarm_clock', 'ambulance', 'angel', 'animal_migration', 'ant', 'anvil', 'apple', 'arm', 'asparagus', 'axe', 'backpack', 'banana', 'bandage', 'barn', 'baseball', 'baseball_bat', 'basket', 'basketball', 'bat', 'bathtub', 'beach', 'bear', 'beard', 'bed', 'bee', 'belt', 'bench', 'bicycle', 'binoculars', 'bird'].\n### Answer:",
+    "response_split": "### Answer:"
+}
