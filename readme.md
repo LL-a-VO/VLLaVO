@@ -1,6 +1,8 @@
 # LLaVO: Large Language Models as Visual Cross-Domain Learners
 This is the offical code of LLaVO.
 
+![Overview of LLaVO](figs/framework.svg)
+
 We extract the descriptions of an images by VLMs (CLIP and BLIP) first, then finetuning LLM (LLaMA) with the descriptions.
 The finetuned LLM can be used to do classification.
 
