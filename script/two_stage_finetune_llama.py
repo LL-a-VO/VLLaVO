@@ -1,8 +1,7 @@
 import os
-import random
 import sys
-import re
-import time
+
+from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 
 sys.path.append('..')
 from typing import List
@@ -21,10 +20,13 @@ logging.basicConfig(level=logging.INFO)
 from peft import (
     LoraConfig,
     get_peft_model,
+    get_peft_model_state_dict,
     prepare_model_for_int8_training,
     set_peft_model_state_dict,
 )
-from transformers import LlamaForCausalLM, LlamaTokenizer
+from transformers import LlamaForCausalLM, LlamaTokenizer, TrainerCallback, TrainingArguments, TrainerState, \
+    TrainerControl, GenerationConfig
+
 
 from utils.prompter import Prompter
 
@@ -38,21 +40,30 @@ def get_dataset(data_path):
         data = load_dataset(data_path)
     return data
 
+def get_dataset_pseudo(data_path):
+    if data_path.endswith(".json") or data_path.endswith(".jsonl"):
+        data = load_dataset("json", data_files=data_path)
+    elif data_path.endswith(".csv"):
+        data = load_dataset("csv", data_files=data_path)
+    else:
+        data = load_dataset(data_path)
+    data['train'] = data['train'].remove_columns("categories")
+
+    return data
+
 def train(
     # model/data params
     base_model: str = "",  # the only required argument
-    source_data_path: str = "",
+    source_data_path: str = "../datasets/dslr_description.csv",
     target_data_path: str = "",
-    source_data_name: str = "",
-    target_data_name: str = "amazon",
+    pseudo_label_path: str = "",
     output_dir: str = "./lora-alpaca",
     # training hyperparams
     batch_size: int = 128,
-    micro_batch_size: int = 32,
+    micro_batch_size: int = 4,
     num_epochs: int = 3,
-    max_steps: int = -1,
-    learning_rate: float = 1e-3,
-    cutoff_len: int = 2048,
+    learning_rate: float = 3e-4,
+    cutoff_len: int = 256,
     val_set_size: int = 0,
     # lora hyperparams
     lora_r: int = 8,
@@ -63,7 +74,7 @@ def train(
         "v_proj",
     ],
     # llm hyperparams
-    train_on_inputs: bool = False,  # if False, masks out inputs in loss
+    train_on_inputs: bool = True,  # if False, masks out inputs in loss
     add_eos_token: bool = False,
     group_by_length: bool = False,  # faster, but produces an odd training loss curve
     wandb_project: str = "",
@@ -73,7 +84,7 @@ def train(
     resume_from_checkpoint: str = None,  # either training checkpoint or final adapter
     prompt_template_name: str = "alpaca",  # The prompt template to use, will default to alpaca.
     used_components: str = "tac",
-    dataset_name: str = 'OfficeHome',
+    dataset_name: str = 'OfficeHome'
 ):
     if int(os.environ.get("LOCAL_RANK", 0)) == 0:
         print(
@@ -97,50 +108,12 @@ def train(
             f"group_by_length: {group_by_length}\n"
             f"resume_from_checkpoint: {resume_from_checkpoint or False}\n"
             f"prompt template: {prompt_template_name}\n"
-            f"dataset_name: {dataset_name}\n"
         )
     assert (
         base_model
     ), "Please specify a --base_model, e.g. --base_model='huggyllama/llama-7b'"
-    gradient_accumulation_steps = batch_size // micro_batch_size
 
     classes = get_dataset_classes(dataset_name)
-
-    prompter = Prompter(prompt_template_name)
-
-    device_map = "auto"
-    world_size = int(os.environ.get("WORLD_SIZE", 1))
-    ddp = world_size != 1
-    if ddp:
-        device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
-        gradient_accumulation_steps = gradient_accumulation_steps // world_size
-
-    use_wandb = len(wandb_project) > 0 or (
-        "WANDB_PROJECT" in os.environ and len(os.environ["WANDB_PROJECT"]) > 0
-    )
-
-    # Only overwrite environ if wandb param passed
-    if len(wandb_project) > 0:
-        os.environ["WANDB_PROJECT"] = wandb_project
-    if len(wandb_watch) > 0:
-        os.environ["WANDB_WATCH"] = wandb_watch
-    if len(wandb_log_model) > 0:
-        os.environ["WANDB_LOG_MODEL"] = wandb_log_model
-
-
-    model = LlamaForCausalLM.from_pretrained(
-        base_model,
-        load_in_8bit=True,
-        torch_dtype=torch.float16,
-        device_map=device_map,
-    )
-
-    tokenizer = LlamaTokenizer.from_pretrained(base_model)
-
-    tokenizer.pad_token_id = (
-        0  # unk. we want this to be different from the eos token
-    )
-    tokenizer.padding_side = "left"  # Allow batched inference
 
     def tokenize(prompt, add_eos_token=True):
         # there's probably a way to do this with the tokenizer settings
@@ -194,14 +167,14 @@ def train(
         descriptions = data_point['descriptions']
         descriptions = refine_descriptions(descriptions)
         full_prompt = prompter.generate_prompt(
-            descriptions,
+            data_point["descriptions"],
             "",
-            most_similar_item(data_point['categories'],classes),
+            most_similar_item(data_point["categories"],classes),
         )
         tokenized_full_prompt = tokenize(full_prompt)
         if not train_on_inputs:
             user_prompt = prompter.generate_prompt(
-                descriptions, ""
+                data_point["descriptions"], ""
             )
             tokenized_user_prompt = tokenize(
                 user_prompt, add_eos_token=add_eos_token
@@ -217,6 +190,44 @@ def train(
                 user_prompt_len:
             ]  # could be sped up, probably
         return tokenized_full_prompt
+
+
+
+    gradient_accumulation_steps = batch_size // micro_batch_size
+
+    prompter = Prompter(prompt_template_name)
+
+    device_map = "auto"
+    world_size = int(os.environ.get("WORLD_SIZE", 1))
+    ddp = world_size != 1
+    if ddp:
+        device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
+        gradient_accumulation_steps = gradient_accumulation_steps // world_size
+
+    use_wandb = len(wandb_project) > 0 or (
+        "WANDB_PROJECT" in os.environ and len(os.environ["WANDB_PROJECT"]) > 0
+    )
+    # Only overwrite environ if wandb param passed
+    if len(wandb_project) > 0:
+        os.environ["WANDB_PROJECT"] = wandb_project
+    if len(wandb_watch) > 0:
+        os.environ["WANDB_WATCH"] = wandb_watch
+    if len(wandb_log_model) > 0:
+        os.environ["WANDB_LOG_MODEL"] = wandb_log_model
+
+    model = LlamaForCausalLM.from_pretrained(
+        base_model,
+        load_in_8bit=True,
+        torch_dtype=torch.float16,
+        device_map=device_map,
+    )
+
+    tokenizer = LlamaTokenizer.from_pretrained(base_model)
+
+    tokenizer.pad_token_id = (
+        0  # unk. we want this to be different from the eos token
+    )
+    tokenizer.padding_side = "left"  # Allow batched inference
 
     model = prepare_model_for_int8_training(model)
 
@@ -252,18 +263,15 @@ def train(
 
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
 
-    # source_data = get_dataset(source_data_path)
-    source_data_list = []
-    source_data_paths = source_data_path.split()
-    source_name_list = source_data_name.split()
-    for i, source_data_path in enumerate(source_data_paths):
-        data = get_dataset(source_data_path)['train']
-        if len(source_name_list) != 0:
-            data = data.add_column('domain_name',[source_name_list[i]]* len(data))
-        source_data_list.append(data)
-
-    source_data = concatenate_datasets(source_data_list)
-    # target_data = get_dataset(target_data_path)
+    source_data = get_dataset(source_data_path)
+    target_data = get_dataset_pseudo(target_data_path)
+    target_data = target_data['train'].rename_column('pseudo_label','categories')
+    # threshold = -0.0002
+    # target_data = target_data.sort('score',reverse=True)
+    # target_data = target_data.select(range(int(len(target_data)*0.5)))
+    # target_data = target_data.filter(lambda datapoint: datapoint['score'] > threshold)
+    source_data = concatenate_datasets([source_data['train'],target_data])
+    # source_data = target_data
 
     # 准备training data
     data_transform = generate_and_tokenize_prompt
@@ -279,8 +287,6 @@ def train(
         )
     else:
         train_data = source_data.shuffle().map(data_transform)
-        # target_data = target_data["train"].shuffle().map(data_transform)
-        # target_data = None
 
     if not ddp and torch.cuda.device_count() > 1:
         # keeps Trainer from trying its own DataParallelism when more than 1 gpu is available
@@ -288,12 +294,10 @@ def train(
         model.model_parallel = True
     print("gradient_accumulation_steps:", gradient_accumulation_steps)
 
-    begin_time = time.time()
-
     trainer = transformers.Trainer(
         model=model,
         train_dataset=train_data,
-        # eval_dataset=target_data,
+        # compute_metrics=compute_metrics,
         args=transformers.TrainingArguments(
             disable_tqdm=True,
             # log_level='debug',
@@ -305,7 +309,6 @@ def train(
             dataloader_drop_last=False,
             num_train_epochs=num_epochs,
             learning_rate=learning_rate,
-            max_steps = max_steps,
             fp16=True, #v100 didn't support bf16
             logging_steps=1, # steps means the optimized step.
             optim="adamw_torch",
@@ -334,10 +337,6 @@ def train(
 
     model.save_pretrained(output_dir)
 
-    end_time = time.time()
-
-    print(f"time cost {(end_time - begin_time) * 1000}")
-
     print(
         "\n If there's a warning about missing keys above, please disregard :)"
     )
@@ -345,4 +344,5 @@ def train(
 
 
 if __name__ == "__main__":
+    # with torch.autocast("cuda"):
     fire.Fire(train)

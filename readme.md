@@ -1,9 +1,10 @@
-# LLaVO: Large Language Models as Visual Cross-Domain Learners
-This is the offical code of LLaVO.
+# VLLaVO: Mitigating Visual Gap through LLMs
 
-![Overview of LLaVO](figs/framework.svg)
+This is the offical code of VLLaVO.
 
-We extract the descriptions of an images by VLMs (CLIP and BLIP) first, then finetuning LLM (LLaMA) with the descriptions.
+![Overview of VLLaVO](figs/framework.svg)
+
+Firstly, we extract the descriptions of an images by VLMs (CLIP and BLIP), then finetuning LLM (LLaMA) with the descriptions.
 The finetuned LLM can be used to do classification.
 
 
@@ -26,7 +27,7 @@ Demos:
 
 # Finetune 
 
-See `DA_llama.sh` in `./script/bash_command` for LLM model llama2.
+See `DG_llama.sh` in `./script/bash_command` for LLM model llama2.
 
 # Evaluate
 

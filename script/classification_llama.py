@@ -16,15 +16,31 @@ sys.path.append("..")
 from utils.universal_utils import most_similar_item,get_dataset_classes
 import transformers
 import torch
+# Load model directly
 from transformers import AutoTokenizer, LlamaForCausalLM, LlamaTokenizer, GenerationConfig
 import os
 from utils.prompter import Prompter
+
 
 if torch.cuda.is_available():
     device = "cuda"
 else:
     device = "cpu"
 
+parser =  argparse.ArgumentParser()
+parser.add_argument('--base_model')
+parser.add_argument('--lora_weights')
+parser.add_argument('-s','--source_data_path')
+parser.add_argument('-t','--target_data_path',nargs='+')
+parser.add_argument('--pseudo_label_path')
+parser.add_argument('-p','--prompt_template_name')
+parser.add_argument('--dataset_name',default='Office31')
+parser.add_argument('--use_demos',action="store_true")
+parser.add_argument('--class_eval',action="store_true")
+parser.add_argument('--save_path')
+parser.add_argument('--domain_name')
+parser.add_argument('--used_components', default='tac')
+args = parser.parse_args()
 
 def generate_full_answer(model, prompt, pbar, new_tokens=50):
     inputs = tokenizer(prompt, return_tensors="pt")
@@ -46,21 +62,37 @@ def generate_full_answer(model, prompt, pbar, new_tokens=50):
         )
     s = generation_output.sequences[0]
     score = generation_output.sequences_scores.item()
+    # pbar.write(f"score:{score}")
     output = tokenizer.decode(s,skip_special_tokens=True)
     return output, score
 
 
-parser =  argparse.ArgumentParser()
-parser.add_argument('--base_model')
-parser.add_argument('--lora_weights')
-parser.add_argument('-s','--source_data_path')
-parser.add_argument('-t','--target_data_path',nargs='+')
-parser.add_argument('--pseudo_label_path')
-parser.add_argument('-p','--prompt_template_name')
-parser.add_argument('--dataset_name',default='Office31')
-parser.add_argument('--class_eval',action="store_true")
-parser.add_argument('--save_path')
-args = parser.parse_args()
+def extract_modules(text):
+    extracted_data = {}
+    cur_module = ""
+    for text in text.split("\n"):
+        if text:
+            if text[-1] == ":":
+                cur_module = text[:-1]
+                extracted_data[cur_module] = []
+            else:
+                extracted_data[cur_module].append(text)
+    return extracted_data
+
+def refine_descriptions(descriptions):
+    used_components = args.used_components
+    refined_descriptions = ""
+    deconstruct_prompt = extract_modules(descriptions)
+    if 't' in used_components:
+        refined_descriptions += "Tags:\n"
+        refined_descriptions += "\n".join(deconstruct_prompt["Tags"]) + "\n"
+    if 'a' in used_components:
+        refined_descriptions += "Attributes:\n"
+        refined_descriptions += "\n".join(deconstruct_prompt["Attributes"]) + "\n"
+    if 'c' in used_components:
+        refined_descriptions += "Captions:\n"
+        refined_descriptions += "\n".join(deconstruct_prompt["Captions"])
+    return refined_descriptions
 
 classes = get_dataset_classes(args.dataset_name)
 
@@ -111,25 +143,19 @@ if args.pseudo_label_path:
 
 target_data = target_data.sample(frac=1, random_state=1024)
 
+# source_data_len = len(source_data)
+# print("source data len:", source_data_len)
 target_data_len = len(target_data)
 print("target data len:", target_data_len)
 
 prompter = Prompter(args.prompt_template_name)
 
-
-def get_prompt_split(description):
-    key_words = ["Tags:","Attributes:","Captions:"]
-    components = [description]
-    for key_word in key_words:
-        temp = []
-        for component in components:
-            temp.extend(component.split(key_word))
-        components = temp
-    return components[1:]
-
+# beging test:
 correct = 0
 
 threshold = -0.0002
+# right_sample_score = []
+# wrong_sample_score = []
 samples_output = []
 pbar = tqdm(range(target_data_len))
 per_class_correct = None
@@ -139,21 +165,43 @@ if args.class_eval:
 
 begin_time = time.time()
 for i in pbar:
-    if i> 500:
-        break
     item = target_data.iloc[i]
     target = most_similar_item(item.categories, classes)
+    descriptions = item.descriptions
+    descriptions = refine_descriptions(descriptions)
 
-    prompt = prompter.generate_prompt(item.descriptions,"")
-    full_answer,score = generate_full_answer(model,prompt,pbar)
+    prompt = prompter.generate_prompt(descriptions,"")
+    full_answer, score = generate_full_answer(model,prompt,pbar)
     answer = prompter.get_response(full_answer)
     output = answer
+    # output = most_similar_item(answer, classes)
+    # if score < threshold:
+    #     pbar.write("Using source to check....")
+    #     description_hub = extend_description(item.descriptions,bm25_list=bm25_list,train_data=source_data)
+    #     outputs = [output]
+    #     scores = [score]
+    #     for description in description_hub:
+    #         prompt = prompter.generate_prompt(description, "")
+    #         full_answer, score = generate_full_answer(model, prompt, pbar)
+    #         answer = prompter.get_response(full_answer)
+    #         output = most_similar_item(answer, classes)
+    #         outputs.append(output)
+    #         scores.append(score)
+    #     # compute the max item that appear.
+    #     # output = max(outputs,key=outputs.count)
+    #
+    #     output_score = {output:{"total_score":sum(score for o,score in zip(outputs,scores) if o==output),
+    #                             "count":outputs.count(output)} for output in outputs}
+    #
+    #     best_output = max(output_score,key= lambda output:output_score[output]["total_score"]/output_score[output]["count"])
+    #     output = best_output
 
     sample = {'categories':target,'pseudo_label':output,'score':score,'descriptions':item.descriptions}
     samples_output.append(sample)
 
     if output!=target:
         pbar.write(f"!!!!! Different")
+        # pbar.write(item.descriptions)
     pbar.write(f"{i}:output1:{output}, target:{target}")
 
     if args.class_eval:
@@ -168,8 +216,9 @@ for i in pbar:
 
 end_time = time.time()
 all_time = end_time - begin_time
-print(all_time/500)
+print("all_time cost",all_time)
 
+# save the result
 if args.save_path:
     pd.DataFrame(samples_output).to_csv(args.save_path)
 if args.class_eval:

@@ -17,6 +17,7 @@ sys.path.append("..")
 from utils.universal_utils import most_similar_item,get_dataset_classes
 import transformers
 import torch
+# Load model directly
 from transformers import AutoTokenizer, LlamaForCausalLM, LlamaTokenizer, GenerationConfig
 import os
 from utils.prompter import Prompter
@@ -29,7 +30,7 @@ else:
 
 def generate_answer(model, descriptions, classes):
     prompt = [prompter.generate_prompt(descriptions, "", class_item) for class_item in classes]
-    inputs = tokenizer(prompt, return_tensors="pt",padding=True)
+    inputs = tokenizer(prompt, return_tensors="pt", padding=True)
     input_ids = inputs["input_ids"].to(device)
     attention_mask = inputs["attention_mask"].to(device)
 
@@ -99,6 +100,7 @@ parser.add_argument('-p','--prompt_template_name')
 parser.add_argument('--dataset_name',default='Office31')
 parser.add_argument('--class_eval',action="store_true")
 parser.add_argument('--save_path')
+parser.add_argument('--lora_weights')
 args = parser.parse_args()
 
 
@@ -120,6 +122,13 @@ model = LlamaForCausalLM.from_pretrained(
     torch_dtype=torch.float16,
     device_map="auto",
 )
+if args.lora_weights:
+    print("Load peft models...")
+    model = PeftModel.from_pretrained(
+        model,
+        args.lora_weights,
+        torch_dtype=torch.float16,
+    )
 
 model.config.pad_token_id = tokenizer.pad_token_id = 0  # unk
 model.config.bos_token_id = 1
@@ -142,32 +151,45 @@ target_data = pd.concat(target_datas)
 
 target_data = target_data.sample(frac=1, random_state=1024)
 
+# source_data_len = len(source_data)
+# print("source data len:", source_data_len)
 target_data_len = len(target_data)
 print("target data len:", target_data_len)
 
 prompter = Prompter(args.prompt_template_name)
 
+def get_prompt_split(description):
+    key_words = ["Tags:","Attributes:","Captions:"]
+    components = [description]
+    for key_word in key_words:
+        temp = []
+        for component in components:
+            temp.extend(component.split(key_word))
+        components = temp
+    return components[1:]
+
 # beging test:
 correct = 0
 
 threshold = -0.0002
+# right_sample_score = []
+# wrong_sample_score = []
 samples_output = []
 pbar = tqdm(range(target_data_len))
 per_class_correct = None
 
 if args.class_eval:
-    per_class_correct = {item:{"correct":0,"count":0} for item in classes}
+    per_class_correct = {item:{"correct":0, "count": 0} for item in classes}
 
 begin_time = time.time()
 for i in pbar:
-    if i > 100:
-        break
     item = target_data.iloc[i]
     target = most_similar_item(item.categories, classes)
     answer = generate_answer(model, item.descriptions, classes)
+    # output = most_similar_item(answer, classes)
     output = answer
 
-    sample = {'categories':target,'pseudo_label':output,'descriptions':item.descriptions}
+    sample = {'categories':target, 'pseudo_label': output, 'descriptions': item.descriptions}
     samples_output.append(sample)
 
     if output!=target:
@@ -185,6 +207,6 @@ for i in pbar:
     pbar.set_postfix({"acc":f"{correct / (i + 1) * 100 : .2f}"})
 
 
-end_time = time.time()
-all_time = end_time - begin_time
-print(all_time/100)
+# end_time = time.time()
+# all_time = end_time - begin_time
+# print(all_time/100)
