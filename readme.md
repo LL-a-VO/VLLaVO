@@ -16,14 +16,18 @@ All model we used in the following list:
 - LLaMA2-7B-chat-hf https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
 - FLAN-T5 https://huggingface.co/t5-base
 
+# Prepare dataset
 
-There are some commands for understanding the code.
+## Diretly download existing dataset
 
-# Description Extract
+We offer the dataset used in our paper on the following link: [dataset link](https://www.dropbox.com/home/datasets)
 
-Demos:
+## Description Extract
+
+If you want to extract the descriptions to construct the dataset by yourself, the following codes can be used.
 
 ```CUDA_VISIBLE_DEVICES=1 python descriptions_extractor.py -s dataset/office_home/image_list/Product.txt --save_path ../datasets/Office_home --base_path dataset/office_home/```
+
 
 # Finetune 
 
