@@ -19,16 +19,7 @@
 #
 #CUDA_VISIBLE_DEVICES=7 python classification_llama.py -t ../datasets/Office_home/Pr_description.csv --base_model data/huggingface_model/Llama-2-7b-chat-hf --dataset_name OfficeHome --lora_weights data/huggingface_model/LoRa_PACS_DG/all --prompt_template_name officehome_demos > ../logs/DG/OfficeHome/all_PACS/pr.log 2>&1
 #
-#
-#CUDA_VISIBLE_DEVICES=7 python classification_llama.py -t ../datasets/VLCS/VOC2007_description.csv --base_model data/huggingface_model/Llama-2-7b-chat-hf --dataset_name VLCS --lora_weights data/huggingface_model/LoRa_PACS_DG/all --prompt_template_name vlcs_demos > ../logs/DG/VLCS/all_PACS/VOC2007.log 2>&1
-#
-#CUDA_VISIBLE_DEVICES=7 python classification_llama.py -t ../datasets/VLCS/Caltech101_description.csv --base_model data/huggingface_model/Llama-2-7b-chat-hf --dataset_name VLCS --lora_weights data/huggingface_model/LoRa_PACS_DG/all --prompt_template_name vlcs_demos > ../logs/DG/VLCS/all_PACS/Caltech101.log 2>&1
-#
-#CUDA_VISIBLE_DEVICES=7 python classification_llama.py -t ../datasets/VLCS/SUN09_description.csv --base_model data/huggingface_model/Llama-2-7b-chat-hf --dataset_name VLCS --lora_weights data/huggingface_model/LoRa_PACS_DG/all --prompt_template_name vlcs_demos > ../logs/DG/VLCS/all_PACS/SUN09.log 2>&1
-#
-#CUDA_VISIBLE_DEVICES=7 python classification_llama.py -t ../datasets/VLCS/LabelMe_description.csv --base_model data/huggingface_model/Llama-2-7b-chat-hf --dataset_name VLCS --lora_weights data/huggingface_model/LoRa_PACS_DG/all --prompt_template_name vlcs_demos > ../logs/DG/VLCS/all_PACS/LabelMe.log 2>&1
-#
-#
+
 #
 #
 #CUDA_VISIBLE_DEVICES=7 python classification_llama.py -t ../datasets/DomainNet/clipart_test_description.csv ../datasets/DomainNet/clipart_train_description.csv --base_model data/huggingface_model/Llama-2-7b-chat-hf --dataset_name DomainNet --lora_weights data/huggingface_model/LoRa_PACS_DG/all --prompt_template_name domainnet_demos > ../logs/DG/DomainNet/all_PACS/clipart.log 2>&1
