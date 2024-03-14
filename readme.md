@@ -18,7 +18,7 @@ All model we used in the following list:
 
 # Prepare dataset
 
-## Diretly download existing dataset
+## Directly download existing dataset
 
 We offer the dataset used in our paper on the following link: [dataset link](https://www.dropbox.com/home/datasets)
 
