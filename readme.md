@@ -2,7 +2,7 @@
 
 This is the offical code of VLLaVO.
 
-![Overview of VLLaVO](figs/framework.svg)
+![Overview of LLaVO](figs/framework.svg)
 
 Firstly, we extract the descriptions of an images by VLMs (CLIP and BLIP), then finetuning LLM (LLaMA) with the descriptions.
 The finetuned LLM can be used to do classification.
@@ -20,7 +20,7 @@ All model we used in the following list:
 
 ## Directly download existing dataset
 
-We offer the dataset used in our paper on the following link: [dataset link](https://www.dropbox.com/home/datasets)
+We offer the dataset used in our paper on the following link: [dataset link](https://www.dropbox.com/scl/fo/brzjl4xzpfzf0r57tkkwr/h?rlkey=zxeabnjpkgbbpwugskpcjzrqa&st=79p516or&dl=0)
 
 ## Description Extract
 
