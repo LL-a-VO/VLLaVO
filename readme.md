@@ -1,6 +1,6 @@
-# VLLaVO: Mitigating Visual Gap through LLMs
+# LLaVO: Large Language models as Visual cross-dOmain learners
 
-This is the offical code of VLLaVO.
+This is the offical code of LLaVO.
 
 ![Overview of LLaVO](figs/framework.svg)
 
