@@ -2,7 +2,7 @@
 
 This is the offical code of LLaVO.
 
-![Overview of LLaVO](figs/framework.svg)
+![Overview of LLaVO](figs/framework_07_13.png)
 
 Firstly, we extract the descriptions of an images by VLMs (CLIP and BLIP), then finetuning LLM (LLaMA) with the descriptions.
 The finetuned LLM can be used to do classification.
